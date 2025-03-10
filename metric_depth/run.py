@@ -5,6 +5,8 @@ import matplotlib
 import numpy as np
 import os
 import torch
+import time
+import sys
 
 from depth_anything_v2.dpt import DepthAnythingV2
 
@@ -51,31 +53,48 @@ if __name__ == '__main__':
     os.makedirs(args.outdir, exist_ok=True)
     
     cmap = matplotlib.colormaps.get_cmap('Spectral')
-    
+
+    total_time = 0
+    num_images = 0
     for k, filename in enumerate(filenames):
-        print(f'Progress {k+1}/{len(filenames)}: {filename}')
-        
+        # print(f'Progress {k+1}/{len(filenames)}: {filename}')
+        sys.stdout.write('\r')
+        sys.stdout.write("\tProgressing image {}/{}: {}".format(k+1, len(filenames), filename))
+        sys.stdout.flush()
+
+        start_time = time.time()
+
         raw_image = cv2.imread(filename)
         
         depth = depth_anything.infer_image(raw_image, args.input_size)
         
         if args.save_numpy:
-            output_path = os.path.join(args.outdir, os.path.splitext(os.path.basename(filename))[0] + '_raw_depth_meter.npy')
+            output_path = os.path.join(args.outdir, os.path.splitext(os.path.basename(filename))[0] + '.npy')
             np.save(output_path, depth)
         
         depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
         depth = depth.astype(np.uint8)
-        
+
         if args.grayscale:
             depth = np.repeat(depth[..., np.newaxis], 3, axis=-1)
         else:
             depth = (cmap(depth)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
-        
+
         output_path = os.path.join(args.outdir, os.path.splitext(os.path.basename(filename))[0] + '.png')
         if args.pred_only:
             cv2.imwrite(output_path, depth)
         else:
             split_region = np.ones((raw_image.shape[0], 50, 3), dtype=np.uint8) * 255
             combined_result = cv2.hconcat([raw_image, split_region, depth])
-            
+
             cv2.imwrite(output_path, combined_result)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        total_time += elapsed_time
+        num_images += 1
+        # print(f'Time taken for this image: {elapsed_time:.4f} seconds')
+    average_time = total_time / num_images
+    print(f'\nTotal images processed: {num_images}')
+    print(f'Total time taken: {total_time:.4f} seconds')
+    print(f'Average time per image: {average_time:.4f} seconds')

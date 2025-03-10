@@ -5,6 +5,7 @@ import matplotlib
 import numpy as np
 import os
 import torch
+import time
 
 from depth_anything_v2.dpt import DepthAnythingV2
 
@@ -46,12 +47,17 @@ if __name__ == '__main__':
         filenames = glob.glob(os.path.join(args.img_path, '**/*'), recursive=True)
     
     os.makedirs(args.outdir, exist_ok=True)
+    print()
     
     cmap = matplotlib.colormaps.get_cmap('Spectral_r')
-    
+
+    total_time = 0
+    num_images = 0
     for k, filename in enumerate(filenames):
         print(f'Progress {k+1}/{len(filenames)}: {filename}')
-        
+
+        start_time = time.time()
+
         raw_image = cv2.imread(filename)
         
         depth = depth_anything.infer_image(raw_image, args.input_size)
@@ -71,3 +77,13 @@ if __name__ == '__main__':
             combined_result = cv2.hconcat([raw_image, split_region, depth])
             
             cv2.imwrite(os.path.join(args.outdir, os.path.splitext(os.path.basename(filename))[0] + '.png'), combined_result)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        total_time += elapsed_time
+        num_images += 1
+        print(f'Time taken for this image: {elapsed_time:.4f} seconds')
+    average_time = total_time / num_images
+    print(f'\nTotal images processed: {num_images}')
+    print(f'Total time taken: {total_time:.4f} seconds')
+    print(f'Average time per image: {average_time:.4f} seconds')
